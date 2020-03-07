@@ -1,0 +1,52 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+import org.apache.commons.io.FileUtils
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath "commons-io:commons-io:2.4"
+    }
+}
+
+ext {
+    chromeDriverVersion = '73.0.3683.68'
+}
+
+task setupChromeDriver {
+    def driverOsFilenamePart
+    if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+        driverOsFilenamePart = "win32"
+    } else if (Os.isFamily(Os.FAMILY_MAC)) {
+        driverOsFilenamePart = "mac64"
+    } else if (Os.isFamily(Os.FAMILY_UNIX)) {
+        driverOsFilenamePart = Os.isArch("amd64") ? "linux64" : "linux32"
+    }
+    def downloadFile = file("$buildDir/webdriver/chromedriver.zip")
+    def outputDir = file("$buildDir/webdriver/chromedriver")
+
+    inputs.property("chromeDriverVersion", chromeDriverVersion)
+    outputs.dir(outputDir)
+
+    doFirst {
+        FileUtils.copyURLToFile(new URL("http://chromedriver.storage.googleapis.com/${chromeDriverVersion}/chromedriver_${driverOsFilenamePart}.zip"), downloadFile)
+        copy{
+            from(zipTree(downloadFile))
+            into(outputDir)
+        }
+    }
+}
+
+task testChrome {
+    finalizedBy test
+    dependsOn setupChromeDriver
+    doLast { 
+        test { 
+            systemProperty(
+                'webdriver.chrome.driver', 
+                "${buildDir}/webdriver/chromedriver/chromedriver${Os.isFamily(Os.FAMILY_WINDOWS)?'.exe':''}"
+            )
+        }
+    }
+}
